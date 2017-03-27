@@ -3,11 +3,26 @@ from PIL import Image, ImageDraw
 from sklearn.cluster import KMeans
 from scipy import spatial
 from skimage import io, color
+import numpy as np
 
 thresholdMap = {
-    2: [[0, 3], [2, 1]],
-    3: [[0, 6, 4], [7, 5, 1], [3, 2, 8]],
-    4: [[0, 12, 3, 15], [8, 4, 11, 7], [2, 14, 1, 13], [10, 6, 9, 5]]
+    2: [[0, 3],
+        [2, 1]],
+    3: [[0, 6, 4],
+        [7, 5, 1],
+        [3, 2, 8]],
+    4: [[ 0, 12,  3, 15],
+        [ 8,  4, 11,  7],
+        [ 2, 14,  1, 13],
+        [10,  6,  9,  5]],
+    8: [[ 0, 48, 12, 60,  3, 51, 15, 63],
+        [32, 16, 44, 28, 35, 19, 47, 31],
+        [ 8, 56,  4, 52, 11, 59,  7, 55],
+        [40, 24, 36, 20, 43, 27, 39, 23],
+        [ 2, 50, 14, 62,  1, 49, 13, 61],
+        [34, 18, 46, 30, 33, 17, 45, 29],
+        [10, 58,  6, 54,  9, 57,  5, 53],
+        [42, 26, 38, 22, 41, 25, 37, 21]],
 }
 
 def bwDither(image, outname, size=4):
@@ -52,43 +67,38 @@ def nearestColour(colour, palette):
 
     return toCol(closestColour)
 
-paletteKDTree = None
-
-def nearestTwo(colour):
-    dist, i = paletteKDTree.query(colour, 2)
-    return toCol(paletteKDTree.data[i[0]]), dist[0], toCol(paletteKDTree.data[i[1]]), dist[1]
+def nearestTwo(palette, colour):
+    dist, i = palette.query(colour, 2)
+    return toCol(palette.data[i[0]]), dist[0], toCol(palette.data[i[1]]), dist[1]
 
 def colourDist(colour1, colour2):
     r1, g1, b1 = colour1
     r2, g2, b2 = colour2
     return ((r2-r1)**2 + (g2-g1)**2 + (b2-b1)**2)
 
+def makePalette(colours):
+    print(colours)
+    return spatial.KDTree(colours)
+
 def findPalette(image, nColours):
     data = image.ravel().reshape(-1, 3)
-    palette = KMeans(n_clusters=nColours, random_state=0, tol=.01).fit(data)
-    print(palette.cluster_centers_)
+    colours = KMeans(n_clusters=nColours, random_state=0, tol=.01).fit(data)
 
-    global paletteKDTree
-    paletteKDTree = spatial.KDTree(palette.cluster_centers_)
-
-    return palette
+    return makePalette(colours.cluster_centers_)
 
 def toCol(list):
     return [int(x) for x in list]
 
-def savePalette(palette, outname):
+def savePalette(colours, fname):
     panelSize = 25
-    nColours = len(palette.cluster_centers_)
+    nColours = len(colours)
     paletteImage = Image.new('RGB', (panelSize * nColours, panelSize))
     draw = ImageDraw.Draw(paletteImage)
-    for i, colour in enumerate(palette.cluster_centers_):
-        draw.rectangle([panelSize * i, 0, panelSize * (i + 1), panelSize], toCol(colour))
-    paletteImage.save(outname + '-' + str(nColours) + 'c-palette.png')
+    for i, colour in enumerate(colours):
+        draw.rectangle([panelSize * i, 0, panelSize * (i + 1), panelSize], tuple(toCol(colour)))
+    paletteImage.save(fname + '-palette.png')
 
-def colourReduce(image, fname, nColours=8):
-    palette = findPalette(image, nColours)
-    # savePalette(palette)
-
+def colourReduce(image, palette, fname):
     width, height, channels = image.shape
     for x in range(0, width):
         for y in range(0, height):
@@ -97,49 +107,69 @@ def colourReduce(image, fname, nColours=8):
 
             image[x][y] = nearest
 
-    return fname + '-' + str(nColours) + 'c-r.png'
+    return fname + '-r.png'
 
-def colourDither(image, fname, nColours=8, size=4):
+def colourDither(image, palette, fname, size=4):
     threshold = thresholdMap[size]
-
-    palette = findPalette(image, nColours)
-    # savePalette(palette, outname)
 
     width, height, channels = image.shape
     for x in range(width):
         for y in range(height):
             colour = image[x][y]
 
-            colour1, dist1, colour2, dist2 = nearestTwo(colour)
+            colour1, dist1, colour2, dist2 = nearestTwo(palette, colour)
             percentage = dist2 / (dist1 + dist2)
             bracket = round(percentage * size**2)
 
             image[x][y] = colour1 if bracket > threshold[x % size][y % size] + 0.5 else colour2
 
-    return fname + '-' + str(nColours) + 'c' + '-' + str(size) + 'x' + str(size) + '.png'
+    return fname + '-' + str(size) + 'x' + str(size) + '.png'
+
+def hexToRGB(hexes):
+    return [[c for c in bytes.fromhex(hex)] for hex in hexes]
 
 def main():
-    nColours = 16
-    size = 4
-    infile = 'chrono-cross.png'
-    file, ext = os.path.splitext(infile)
-    lab = True
+    nColours = 8
+    size = 8
+    infile = 'originals/lenna.png'
+    basename = os.path.basename(infile)
+    fname, ext = os.path.splitext(basename)
+    lab = False
+    manualPalette = False
 
-    image = io.imread('originals/' + infile)
+    image = io.imread(infile)
     if lab:
         image = color.rgb2lab(image)
 
-    fname = 'dithered/' + file
-    if (lab):
-        fname += '-l'
+    colours = None
+    if manualPalette:
+        chrono = ['080000', '201A0B', '432817', '492910',
+                  '234309', '5D4F1E', '9C6B20', 'A9220F',
+                  '2B347C', '2B7409', 'D0CA40', 'E8A077',
+                  '6A94AB', 'D5C4B3', 'FCE76E', 'FCFAE2']
+        colours = hexToRGB(chrono)
+        if (lab):
+            labColours = color.rgb2lab(np.array([colours], dtype=np.uint8))[0]
+            palette = makePalette(labColours)
+        else:
+            palette = makePalette(colours)
+    else:
+        palette = findPalette(image, nColours)
+        colours = palette.data
 
-    # fname = colourReduce(image, fname, nColours)
-    fname = colourDither(image, fname, nColours, size)
+    fname += '-' + str(len(colours)) + 'c'
+    if lab:
+        fname += '-L'
+
+    savePalette(colours, 'palettes/' + fname)
+
+    # fname = colourReduce(image, fname)
+    fname = colourDither(image, palette, fname, size)
 
     if lab:
         image = color.lab2rgb(image)
 
-    io.imsave(fname, image)
+    io.imsave('dithered/' + fname, image)
 
     print(fname + " saved!")
 
