@@ -25,38 +25,8 @@ thresholdMap = {
         [42, 26, 38, 22, 41, 25, 37, 21]],
 }
 
-def bwDither(image, outname, size=4):
-    threshold = thresholdMap[size]
-
-    width, height = image.shape
-    for x in range(0, width, size):
-        for y in range(0, height, size):
-
-            count = 0
-            total = 0
-            for i in range(0, size):
-                for j in range(0, size):
-                    try:
-                        r, g, b = image.getpixel((x + i, y + j))
-                        total += (r + g + b) / 3
-                        count += 1  # count is needed in case we go past the edge of the picture
-                    except IndexError:
-                        pass
-
-            grey = total / count
-            bracketed = round(grey / (256 / (size * size)))
-
-            for i in range(0, size):
-                for j in range(0, size):
-                    try:
-                        image.putpixel((x + i, y + j), ((bracketed > threshold[i][j] + 0.5 and 255,) * 3))
-                    except IndexError:
-                        pass
-
-    image.save(outname)
-
 def nearestColour(colour, palette):
-    pal = palette.cluster_centers_
+    pal = palette.data
     closestColour = pal[0]
     closestDist = colourDist(colour, toCol(pal[0]))
     for c in pal[1:]:
@@ -98,6 +68,20 @@ def savePalette(colours, fname):
         draw.rectangle([panelSize * i, 0, panelSize * (i + 1), panelSize], tuple(toCol(colour)))
     paletteImage.save(fname + '-palette.png')
 
+def bwOrderedDither(image, fname, size):
+    threshold = thresholdMap[size]
+
+    width, height, channels = image.shape
+    for x in range(width):
+        for y in range(height):
+            colour = image[x][y]
+            grey = (int(colour[0]) + int(colour[1]) + int(colour[2])) / 3
+            bracketed = round(grey / (256 / (size * size)))
+
+            image[x][y]= [bracketed > threshold[x % size][y % size] + 0.5 and 255,] * 3
+
+    return fname + '-bw-' + str(size) + 'x' + str(size) + '.png'
+
 def colourReduce(image, palette, fname):
     width, height, channels = image.shape
     for x in range(0, width):
@@ -109,7 +93,7 @@ def colourReduce(image, palette, fname):
 
     return fname + '-r.png'
 
-def colourDither(image, palette, fname, size=4):
+def colourOrderedDither(image, palette, fname, size):
     threshold = thresholdMap[size]
 
     width, height, channels = image.shape
@@ -129,42 +113,48 @@ def hexToRGB(hexes):
     return [[c for c in bytes.fromhex(hex)] for hex in hexes]
 
 def main():
-    nColours = 8
+    nColours = 4
     size = 8
     infile = 'originals/lenna.png'
     basename = os.path.basename(infile)
     fname, ext = os.path.splitext(basename)
     lab = False
     manualPalette = False
+    mode = 'reduce'
 
     image = io.imread(infile)
     if lab:
         image = color.rgb2lab(image)
 
-    colours = None
-    if manualPalette:
-        chrono = ['080000', '201A0B', '432817', '492910',
-                  '234309', '5D4F1E', '9C6B20', 'A9220F',
-                  '2B347C', '2B7409', 'D0CA40', 'E8A077',
-                  '6A94AB', 'D5C4B3', 'FCE76E', 'FCFAE2']
-        colours = hexToRGB(chrono)
-        if (lab):
-            labColours = color.rgb2lab(np.array([colours], dtype=np.uint8))[0]
-            palette = makePalette(labColours)
+    if 'bw' not in mode:
+        colours = None
+        if manualPalette:
+            chrono = ['080000', '201A0B', '432817', '492910',
+                      '234309', '5D4F1E', '9C6B20', 'A9220F',
+                      '2B347C', '2B7409', 'D0CA40', 'E8A077',
+                      '6A94AB', 'D5C4B3', 'FCE76E', 'FCFAE2']
+            colours = hexToRGB(chrono)
+            if (lab):
+                labColours = color.rgb2lab(np.array([colours], dtype=np.uint8))[0]
+                palette = makePalette(labColours)
+            else:
+                palette = makePalette(colours)
         else:
-            palette = makePalette(colours)
-    else:
-        palette = findPalette(image, nColours)
-        colours = palette.data
+            palette = findPalette(image, nColours)
+            colours = palette.data
 
-    fname += '-' + str(len(colours)) + 'c'
-    if lab:
-        fname += '-L'
+        fname += '-' + str(len(colours)) + 'c'
+        if lab:
+            fname += '-L'
 
-    savePalette(colours, 'palettes/' + fname)
+        savePalette(colours, 'palettes/' + fname)
 
-    # fname = colourReduce(image, fname)
-    fname = colourDither(image, palette, fname, size)
+    if mode == 'bwOrd':
+        fname = bwOrderedDither(image, fname, size)
+    if mode == 'reduce':
+        fname = colourReduce(image, palette, fname)
+    elif mode == 'colourOrd':
+        fname = colourOrderedDither(image, palette, fname, size)
 
     if lab:
         image = color.lab2rgb(image)
