@@ -1,7 +1,4 @@
 import os
-import operator
-import random
-import numpy as np
 from PIL import Image, ImageDraw
 from sklearn.cluster import KMeans
 from scipy import spatial
@@ -67,26 +64,6 @@ def colourDist(colour1, colour2):
     return ((r2-r1)**2 + (g2-g1)**2 + (b2-b1)**2)
 
 def findPalette(image, nColours):
-
-    # def kMeans(clusters, data, iters):
-    #     for it in range(iters):
-    #         assignments = [[] for i in range(len(clusters))]
-    #         for point in data:
-    #             distances = [(colourDist(point, cluster), i) for i, cluster in enumerate(clusters)]
-    #             cluster, i = min(distances)
-    #             assignments[i].append(point)
-    #
-    #         print([len(x) for x in assignments])
-    #         for i, assignment in enumerate(assignments):
-    #             if len(assignment) > 0:
-    #                 clusters[i] = tuple([sum(x) / len(assignment) for x in zip(*assignment)]) # average of the points
-    #         print(clusters)
-
-    # start with nColours randomly generated colours
-    # palette = [(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)) for i in range(nColours)]
-    # kMeans(palette, list(image.getdata()), 10)
-
-    # data = np.array(image.getdata())
     data = image.ravel().reshape(-1, 3)
     palette = KMeans(n_clusters=nColours, random_state=0, tol=.01).fit(data)
     print(palette.cluster_centers_)
@@ -94,8 +71,6 @@ def findPalette(image, nColours):
     global paletteKDTree
     paletteKDTree = spatial.KDTree(palette.cluster_centers_)
 
-    # p = [(180.03311678424606, 79.65831345480383, 91.0300588742831), (103.88152738838883, 30.588313413014607, 70.02926565343564), (119, 252, 20), (213.95614663217222, 128.09845929963964, 118.37952739536173), (229.1862956229898, 188.24502866731925, 166.0561040413928)]
-    # return [(int(r), int(g), int(b)) for r, g, b in p]
     return palette
 
 def toCol(list):
@@ -131,39 +106,16 @@ def colourDither(image, fname, nColours=8, size=4):
     # savePalette(palette, outname)
 
     width, height, channels = image.shape
-    # width, height = image.size
     for x in range(width):
         for y in range(height):
-
-            # count = 0
-            # total = (0, 0, 0)
-            # for i in range(0, size):
-            #     for j in range(0, size):
-            #         try:
-            #             colour = image.getpixel((x + i, y + j))
-            #             total = tuple(map(operator.add, total, colour))
-            #             count += 1  # count is needed in case we go past the edge of the picture
-            #         except IndexError:
-            #             pass
-
             colour = image[x][y]
-            # colour = image.getpixel((x, y))
 
-            # colour = tuple(x / count for x in total)
             colour1, dist1, colour2, dist2 = nearestTwo(colour)
             percentage = dist2 / (dist1 + dist2)
-            # bracket = round((percentage / (1 + percentage**2))**(0.5) * size**2)
             bracket = round(percentage * size**2)
 
             image[x][y] = colour1 if bracket > threshold[x % size][y % size] + 0.5 else colour2
-            # image.putpixel((x, y), colour1 if bracket > threshold[x % size][y % size] + 0.5 else colour2)
 
-            # for i in range(0, size):
-            #     for j in range(0, size):
-            #         try:
-            #             image.putpixel((x + i, y + j), colour1 if bracket > threshold[i][j] + 0.5 else colour2)
-            #         except IndexError:
-            #             pass
     return fname + '-' + str(nColours) + 'c' + '-' + str(size) + 'x' + str(size) + '.png'
 
 def main():
@@ -173,12 +125,10 @@ def main():
     file, ext = os.path.splitext(infile)
     lab = True
 
-    # image = Image.open('originals/' + infile).convert("RGB")
     image = io.imread('originals/' + infile)
     if lab:
         image = color.rgb2lab(image)
 
-    # colourDither(image, nColours, size)
     fname = 'dithered/' + file
     if (lab):
         fname += '-l'
@@ -192,7 +142,6 @@ def main():
     io.imsave(fname, image)
 
     print(fname + " saved!")
-    # image.save(filename)
 
 if __name__ == "__main__":
     main()
