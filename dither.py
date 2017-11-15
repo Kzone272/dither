@@ -251,30 +251,37 @@ def main():
     #
     # This is where you can change any of the variables to alter the settings when running dither.py
     ###########################################
+
     nColours = 3 # The number colours to use when generating a dynamic palette
                  # This is ignored when manualPalette is specified or when
                  # using a black and white mode
+
     size = 8 # Size of the Bayer filter pattern to use when producing and ordered dithered image
              # Can be any value from: 2, 3, 4, 8
+
     infile = 'originals/lenna.png' # The path to the target input image file
                                    # This is relative to the directory you are running `python dither.py` from
                                    # Ideally you should be running it from within the dither folder
     lab = False # Enable Lab colour mode (does not work with Floyd Steinberg dithering modes)
+
     manualPalette = '' # Specify the name of a palette in the `palettes` map above to use that palette
                        # This will override the nColours setting and not generate a dynmaic palette when set
                        # A value of '' will not set a manual palette and instead generate a dynamic one
                        # e.g. manualPalette = 'ega16'
                        # e.g. manualPalette = 'obama'
+                       # Id you'd like you can use your own custom palette by adding it to `palettes` map above
+
     mode = 'colourOrd' # Sets the mode for which type of image to generate
                        # This can be set to one of:
                        #
                        # 'bwOrd': black and white ordered dither
                        # 'bwFS': black and bhite Floyd Steinberg dither
                        # 'reduce': colour reduction without dithering
-                       #  'colourOrd': a colour ordered dither
-                       #  'colourFS': a colour Floyd Steinberg dither
+                       # 'colourOrd': a colour ordered dither
+                       # 'colourFS': a colour Floyd Steinberg dither
                        #
                        # e.g. mode = 'colourOrd'
+
     #####################################
     # END OF CONFIGURATION ZONE
     #
