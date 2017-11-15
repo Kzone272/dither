@@ -69,5 +69,4 @@ Hopefully this isn't too cumbersome.
 If You Have Any Problems
 ==
 
-If for some reason it still doesn't work the PowerPoint should give a pretty good idea what this program can do.
-And if need be I can run through some images for you myself and send them back if you'd like.
+If for some reason it still doesn't work, the PowerPoint should give a pretty good idea what this program can do.
