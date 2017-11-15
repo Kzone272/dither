@@ -1,4 +1,4 @@
-PROVIDED:
+Provided
 ==
 
 All the code can be found in the dither.py file.
@@ -11,7 +11,7 @@ There is more there than I included in the PowerPoint so you can have look at so
 Due to technical limitations and time restrictions, I was not able to make a distributable build of the code for you.
 So instead I've provided these instruction for how to run this program yourself.
 
-INSTALLATION INSTRUCTIONS:
+Installation Instructions
 ==
 
 You will need python 3.4 installed on your computer.
@@ -56,7 +56,7 @@ Note: The running time for the 512 by 512 pixel Lenna image (originals/lenna.png
       generate a coloured dither image.  Expect this time to scale about linearly with the number of pixels
       in the image.
 
-CONFIGURATION:
+Configuration
 ==
 
 At the very bottom of dither.py you'll find the main() function.  At the top of the main function you'll find
@@ -66,11 +66,8 @@ Further instructions on those details can be found in the comments in that secti
 I wanted to make a nice GUI to make it much easier for you to use, but unfortunately I didn't have the time.
 Hopefully this isn't too cumbersome.
 
-IF YOU HAVE ANY PROBLEMS:
+If You Have Any Problems
 ==
-
-Please email me kahaslet@uwaterloo.ca if any of these steps don't work properly or if you have any questions.
-I will get back to you ASAP and try my best to make sure you can get this program running.
 
 If for some reason it still doesn't work the PowerPoint should give a pretty good idea what this program can do.
 And if need be I can run through some images for you myself and send them back if you'd like.
