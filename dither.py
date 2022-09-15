@@ -5,6 +5,7 @@ from sklearn.cluster import KMeans
 from scipy import spatial
 from skimage import io, color, img_as_float
 import numpy as np
+import itertools
 
 #  Map of bayer filters for various sizes
 thresholdMap = {
@@ -40,16 +41,64 @@ def nearestTwo(palette, colour):
     dist, i = palette.query(colour, 2)
     return palette.data[i[0]], dist[0], palette.data[i[1]], dist[1]
 
+# Find the mapping from colours in palatte to rPalette that produce
+# the lowest error
+def nearestMapping(palette, remap_colors):
+    print(palette.data)
+    print(remap_colors)
+    mapping = dict()
+
+    tree = spatial.KDTree(remap_colors)
+    for c in palette.data:
+        dist, i = tree.query(c)
+        mapping[tuple(c)] = tree.data[i]
+
+    return mapping
+
+# Similar to nearestMapping(), creates a remap from palette to
+# remap_colors but ensures that no remap_colors are reused.
+# The goal was to create more variation with fewer large blocks
+# of the same color. It works, but it might look worse.
+# It works by selecting the best match from the unmatched src/dst
+# colors, commiting that to the remap, then recomputing the best
+# match amond the remaining colors.
+def nearestMapping2(palette, remap_colors):
+    print(palette.data)
+    print(remap_colors)
+    # print(list(map(tuple, remap_colors)))
+    avail = set(list(map(tuple, remap_colors)))
+    to_map = set(list(map(tuple, palette.data)))
+    mapping = dict()
+    used_all = False
+    while len(to_map):
+        tree = spatial.KDTree(list(avail))
+        matches = []
+        for c in to_map:
+            dist, i = tree.query(c)
+            matches.append((c, dist, tree.data[i]))
+
+        matches = sorted(matches, key=lambda x: x[1])
+        best = matches[0]
+        col = best[0]
+        remapped = best[2]
+        mapping[tuple(col)] = remapped
+        print(col, remapped)
+        to_map.remove(col)
+        avail.remove(tuple(remapped))
+
+
+    return mapping
+
 # Make a kd-tree palette from the provided list of colours
 def makePalette(colours):
-    print(colours)
+    # print(colours)
     return spatial.KDTree(colours)
 
 # Dynamically calculates and N-colour palette for the given image
 # Uses the KMeans clustering algorithm to determine the best colours
 # Returns a kd-tree palette with those colours
 def findPalette(image, nColours):
-     # fit all the coloyrs in
+     # fit all the colors in
     data = image.ravel().reshape(-1, 3)
     kmeans = KMeans(n_clusters=nColours, random_state=0, tol=.01).fit(data)
     colours = kmeans.cluster_centers_
@@ -140,9 +189,12 @@ def colourReduce(image, palette, fname):
     # Append  a descriptive marking to the end of the file and return it
     return fname + '-r.png'
 
+def remapColour(remap, colour):
+    return remap[tuple(colour)]
+
 # Produce an ordered dither of the image with the give Bayer Filter size
 # using only the colours in the provided palette
-def colourOrderedDither(image, palette, fname, size):
+def colourOrderedDither(image, palette, remap, fname, size):
     threshold = thresholdMap[size]
 
     width, height, *rest = image.shape
@@ -160,7 +212,10 @@ def colourOrderedDither(image, palette, fname, size):
 
             # Finally, check if that bracketed colour should be colour1 or colour2 based on the
             # threshhold for the current pixel
-            image[x][y] = colour1 if bracket > threshold[x % size][y % size] + 0.5 else colour2
+            colourMatch = colour1 if bracket > threshold[x % size][y % size] + 0.5 else colour2
+            if (remap):
+                colourMatch = remapColour(remap, colourMatch)
+            image[x][y] = colourMatch
 
     # Append  a descriptive marking to the end of the file and return it
     return fname + '-' + str(size) + 'x' + str(size) + '.png'
@@ -242,7 +297,14 @@ palettes = {
     'millet': ['bbaf9c', '4b4033', '957b50', 'f3decc', '27211a', 'ba9b61', '705b41', 'dcc5af'],
 
     'obama': ['01253d', 'e7000a', '5092a0', 'f0dfb3'],
+    'rubiks': ['ff0000', 'ff8800', 'ffff00', '00ff00', '0000ff', 'ffffff'],
+    # rubiks colors without green, which can look bad
+    'rubiks2': ['ff2222', 'ff8800', 'ffff00', '2222dd', 'ffffff'],
 }
+
+def makeManualPalette(paletteName):
+    colours = hexToRGB(palettes[paletteName])
+    return makePalette(colours)
 
 # This is the main function the runs when runnging `python dither.py`
 def main():
@@ -252,24 +314,26 @@ def main():
     # This is where you can change any of the variables to alter the settings when running dither.py
     ###########################################
 
-    nColours = 3 # The number colours to use when generating a dynamic palette
+    nColours = 6 # The number colours to use when generating a dynamic palette
                  # This is ignored when manualPalette is specified or when
                  # using a black and white mode
 
     size = 8 # Size of the Bayer filter pattern to use when producing and ordered dithered image
              # Can be any value from: 2, 3, 4, 8
 
-    infile = 'originals/lenna.png' # The path to the target input image file
+    infile = 'originals/sunday-30.png' # The path to the target input image file
                                    # This is relative to the directory you are running `python dither.py` from
                                    # Ideally you should be running it from within the dither folder
     lab = False # Enable Lab colour mode (does not work with Floyd Steinberg dithering modes)
 
-    manualPalette = '' # Specify the name of a palette in the `palettes` map above to use that palette
+    manualPalette = 'rubiks' # Specify the name of a palette in the `palettes` map above to use that palette
                        # This will override the nColours setting and not generate a dynmaic palette when set
                        # A value of '' will not set a manual palette and instead generate a dynamic one
                        # e.g. manualPalette = 'ega16'
                        # e.g. manualPalette = 'obama'
                        # Id you'd like you can use your own custom palette by adding it to `palettes` map above
+    reassignPalette = 'rubiks'
+    # reassignPalette = ''
 
     mode = 'colourOrd' # Sets the mode for which type of image to generate
                        # This can be set to one of:
@@ -313,6 +377,8 @@ def main():
     if lab and mode != 'colourFS':
         image = color.rgb2lab(image)
 
+    remap = None
+
     # For colour modes only
     if 'bw' not in mode:
         if manualPalette:
@@ -333,6 +399,12 @@ def main():
         else:
             # Dynamically generate an N colour palette for the given image
             palette = findPalette(image, nColours)
+            if reassignPalette:
+                remap_colors = hexToRGB(palettes[reassignPalette])
+                if lab:
+                    remap_colors = color.rgb2lab(np.array([remap_colors], dtype=np.uint8))[0]
+                remap = nearestMapping2(palette, remap_colors)
+
             colours = palette.data
             # Add a the number of colours to the output filename
             fname += '-' + str(len(colours)) + 'c'
@@ -340,6 +412,8 @@ def main():
             if lab and mode != 'colourFS':
                 fname += '-L' # Add an indicator to the filename that this was a Lab colourspace palette
                 colours = color.lab2rgb([colours])[0]
+            if reassignPalette:
+                fname += '-' + reassignPalette
             # Convert our palette colours to a consisten range for saving to a file
             colours = img_as_float([colours.astype(np.ubyte)])[0]
             savePalette(colours, 'palettes/' + fname) # Save the palette file
@@ -352,7 +426,7 @@ def main():
     if mode == 'reduce':
         fname = colourReduce(image, palette, fname)
     elif mode == 'colourOrd':
-        fname = colourOrderedDither(image, palette, fname, size)
+        fname = colourOrderedDither(image, palette, remap, fname, size)
     elif mode == 'colourFS':
         fname = colourFloydSteinbergDither(image, palette, fname)
 
