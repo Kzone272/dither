@@ -1,3 +1,21 @@
+Screenshots
+==
+
+Black & White Floyd-Steinberg Dither  
+![](output/chrono-cross-bw-FS.png)
+
+6 Colour 8x8 Ordered Dither  
+![](output/iron-man-6c-8x8.png)
+
+8 Colour 8x8 Orderer Dither, palette from original painting  
+![](output/millet-8c-8x8.png)
+
+6 Colour 8x8 Orderer Dither, palette from another painting  
+![](output/millet-gypsy-8x8.png)
+
+16 Colour Floyd-Steinberg Dither  
+![](output/sunday-ega16-FS.png)
+
 Provided
 ==
 
